@@ -1,0 +1,8 @@
+node_modules/
+.env
+.DS_Store
+Thumbs.db
+# SQLite database is created automatically on first run
+tasks.db
+tasks.db-wal
+tasks.db-shm

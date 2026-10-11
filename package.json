@@ -1,0 +1,18 @@
+{
+  "name": "week-3-crud-sqlite",
+  "version": "1.0.0",
+  "description": "FlyRank Week 3 (BE-02) — Tasks CRUD API backed by a SQLite database instead of an in-memory array",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test/api.test.js"
+  },
+  "keywords": ["express", "sqlite", "crud", "api", "flyrank"],
+  "author": "Ayushman Bajracharya",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^4.21.2"
+  }
+}
