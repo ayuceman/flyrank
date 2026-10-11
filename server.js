@@ -36,6 +36,8 @@ const stmts = {
   all: db.prepare("SELECT id, title, done FROM tasks ORDER BY id"),
   byId: db.prepare("SELECT id, title, done FROM tasks WHERE id = ?"),
   insert: db.prepare("INSERT INTO tasks (title, done) VALUES (?, ?)"),
+  update: db.prepare("UPDATE tasks SET title = ?, done = ? WHERE id = ?"),
+  remove: db.prepare("DELETE FROM tasks WHERE id = ?"),
 };
 
 // Validate a request body. Returns an error message, or null if valid.
@@ -89,6 +91,34 @@ app.post("/tasks", (req, res) => {
   const result = stmts.insert.run(title, done);
   const row = stmts.byId.get(result.lastInsertRowid);
   res.status(201).json(toTask(row));
+});
+
+// ---------------------------------------------------------------------------
+// Stage 3 — Update and delete
+// ---------------------------------------------------------------------------
+
+// PUT /tasks/:id — update title and/or done; 404 unknown id, 400 invalid body
+app.put("/tasks/:id", (req, res) => {
+  const id = parseId(req.params.id);
+  const existing = id === null ? undefined : stmts.byId.get(id);
+  if (!existing) return res.status(404).json({ error: "Task not found" });
+
+  const error = validateBody(req.body, { partial: true });
+  if (error) return res.status(400).json({ error });
+
+  const title = req.body.title !== undefined ? req.body.title.trim() : existing.title;
+  const done = req.body.done !== undefined ? (req.body.done ? 1 : 0) : existing.done;
+
+  stmts.update.run(title, done, id);
+  res.json(toTask(stmts.byId.get(id)));
+});
+
+// DELETE /tasks/:id — remove the row; 404 if it never existed
+app.delete("/tasks/:id", (req, res) => {
+  const id = parseId(req.params.id);
+  const result = id === null ? { changes: 0 } : stmts.remove.run(id);
+  if (result.changes === 0) return res.status(404).json({ error: "Task not found" });
+  res.status(204).send();
 });
 
 // Malformed JSON bodies -> 400 with a JSON error (instead of Express's HTML page)
