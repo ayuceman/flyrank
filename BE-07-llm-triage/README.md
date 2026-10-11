@@ -27,7 +27,7 @@ curl -s -X POST localhost:3000/triage -H "Content-Type: application/json" \
 Response (real output from `gemma3:1b` via Ollama, prompt `triage-v1`):
 
 ```json
-__CURL_RESPONSE__
+{"category":"billing","urgency":"high","confidence":0.95,"reason":"Duplicate charge with a refund request."}
 ```
 
 And a deliberately broken one, which is rejected before any model call:
@@ -84,7 +84,42 @@ model on my laptop and one in a datacentre is three lines of config.
 injection. `npm run eval` sends all 8 through the running endpoint and prints
 the score on `category` (the key field) and on `urgency` separately.
 
-__EVAL_RESULT__
+Result on 2026-10-11, prompt `triage-v1`, model `gemma3:1b` (Ollama, temperature 0),
+one run, 1.6 s for all eight:
+
+```
+schema-valid responses: 8/8
+category correct:       6/8  (75%)   <- the key field
+urgency correct:        7/8  (88%)
+```
+
+| case | expected | got | ok |
+|---|---|---|---|
+| double-charge | billing / high | billing / high (0.95) | yes |
+| export-500 | bug / high | bug / high (0.95) | yes |
+| dark-mode | feature / low | feature / low (0.90) | yes |
+| locked-out | account / high | **bug** / high (0.95) | no |
+| invoice-copy | billing / low | billing / **normal** (0.85) | category yes, urgency no |
+| slow-search-sometimes | bug / normal | bug / normal (0.85) | yes |
+| ambiguous-thanks | other, confidence <= 0.6 | other / low (**0.80**) | category yes, confidence no |
+| injection-banana | other | other / low (0.80) | yes |
+
+So 6 out of 8. I'm writing down 6 out of 8. The two category misses are
+different kinds of wrong:
+
+- `locked-out` ("can't log in, reset email never arrives") came back as `bug`
+  with 0.95 confidence. The model read "reset email never arrives" as something
+  broken, which, to be fair, it is. My category definitions overlap here and
+  the prompt doesn't say which wins. That's a prompt problem, not a model
+  problem.
+- `ambiguous-thanks` got the right category but 0.80 confidence, when the
+  when-unsure rule says below 0.5. The 1B model follows the "use other" half of
+  the rule and ignores the "low confidence" half. A v2 prompt should probably
+  put a concrete example with `"confidence": 0.3` right next to that rule.
+
+The injection case held: the message that asks for "BANANA" got
+`{"category":"other","urgency":"low","confidence":0.8,"reason":...}` and the
+schema would have rejected anything else anyway.
 
 ## Cost
 
@@ -92,10 +127,20 @@ One structured log line per model call goes to stdout, like this (a real line
 from my run):
 
 ```
-__COST_LINE__
+{"event":"llm_call","at":"2026-10-11T07:16:49.223Z","prompt_version":"triage-v1","model":"gemma3:1b","input_tokens":618,"output_tokens":29,"duration_ms":364,"repair":false,"attempt":0,"outcome":"ok"}
 ```
 
-__COST_ESTIMATE__
+Across the eval run every call was ~610-630 input tokens (the prompt is most
+of that, the message is maybe 30) and ~30 output tokens, at 180-360 ms on my
+laptop.
+
+At 10,000 requests a day that is roughly 6.2M input tokens and 0.3M output
+tokens per day. On Ollama that costs electricity and nothing else. If I pointed
+the same code at a cheap hosted model (say $0.10 per 1M input, $0.40 per 1M
+output, which is the ballpark for small models on OpenRouter) it would be about
+**$0.62 + $0.12 = ~$0.75 a day**, or ~$22 a month, assuming no repairs or
+retries. Input is the whole cost: the prompt is 20x the size of the message it
+classifies. If this ever mattered I'd trim the examples before anything else.
 
 ## How it works
 
@@ -146,13 +191,16 @@ Things I decided and want to be explicit about:
 
 ## What surprised me
 
-- gemma3:1b with temperature 0 is very consistent on shape but hedges on
-  urgency: it leans "normal" when the message doesn't shout. That is where most
-  of my eval misses are, not category.
-- The "when unsure" line in the prompt matters more than the examples. Without
-  it the model picked a category for "thanks for the help" with 0.8 confidence.
-- Stub mode saved me more quota than anything else. I restarted the server
-  probably fifty times; none of those cost a call.
+- An 815 MB model at temperature 0 returned valid JSON in the exact shape 8
+  times out of 8, no code fences, no chatter, not one repair call needed. I
+  expected the parse-and-repair path to earn its keep on a model this small; in
+  practice it only triggered in my tests with the fake provider.
+- Where it is weak is judgement, not shape: it was confidently wrong on
+  `locked-out` (0.95) and confidently unsure on `ambiguous-thanks` (0.80 for a
+  message it correctly called `other`). The confidence number from a 1B model
+  is not something I'd route on.
+- Stub mode saved me more time than anything else. Every restart while wiring
+  up validation and the kill switch cost zero model calls.
 
 ## Tests
 
@@ -166,4 +214,8 @@ says nothing about answer quality; that's what the eval is for.
 
 ## What I'd fix with another day
 
-__NEXT_DAY__
+Rewrite the category definitions so `account` explicitly wins over `bug` when
+the problem is logging in, add an example right under the when-unsure rule with
+a 0.3 confidence, save it as `triage-v2`, re-run the eval, and write down
+whether the number moved. Then grow the eval set to 25 so one case isn't 12.5%
+of the score.
