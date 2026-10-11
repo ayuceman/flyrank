@@ -1,5 +1,6 @@
 const express = require("express");
 const { supabase } = require("../supabase");
+const { requireAuth } = require("../middleware/requireAuth");
 
 const router = express.Router();
 
@@ -56,6 +57,27 @@ router.post("/login", async (req, res) => {
     expires_in: data.session.expires_in,
     user: { id: data.user.id, email: data.user.email },
   });
+});
+
+// POST /auth/logout  -> 204
+// Needs a valid token (so it goes through the same guard). Supabase then
+// revokes the session server-side; that token is dead from here on.
+router.post("/logout", requireAuth, async (req, res, next) => {
+  try {
+    // supabase.auth.signOut() in supabase-js v2 signs out the *client's* own
+    // stored session, and this server keeps none (persistSession: false).
+    // So I call the same endpoint the SDK calls, with the caller's token.
+    const resp = await fetch(`${process.env.SUPABASE_URL}/auth/v1/logout`, {
+      method: "POST",
+      headers: { apikey: process.env.SUPABASE_KEY, Authorization: `Bearer ${req.token}` },
+    });
+    if (!resp.ok) {
+      return res.status(502).json({ error: `Logout failed upstream (${resp.status})` });
+    }
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

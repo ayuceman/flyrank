@@ -1,40 +1,31 @@
 const express = require("express");
-const { supabase } = require("../supabase");
+const { requireAuth } = require("../middleware/requireAuth");
 
 const router = express.Router();
 
-// Pull the token out of "Authorization: Bearer <token>". Returns null if the
-// header is missing, isn't Bearer, or has nothing after "Bearer ".
-function extractToken(req) {
-  const header = req.get("authorization");
-  if (!header) return null;
-  const [scheme, token, ...rest] = header.trim().split(/\s+/);
-  if (!/^bearer$/i.test(scheme) || !token || rest.length) return null;
-  return token;
-}
+// Everything under /protected goes through the guard first.
+router.use(requireAuth);
 
-// GET /protected/profile - Stage 3: the guard actually checks the pass.
-router.get("/profile", async (req, res) => {
-  const token = extractToken(req);
-  if (!token) return res.status(401).json({ error: "Access token required" });
-
-  // getUser(token) sends the token to Supabase, which checks the signature,
-  // expiry and that the session hasn't been revoked. If any of that fails we
-  // get an error back instead of a user.
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user) {
-    return res.status(401).json({ error: "Invalid or expired token" });
-  }
-
+// GET /protected/profile
+router.get("/profile", (req, res) => {
   res.json({
     message: "This is your private profile.",
     user: {
-      id: data.user.id,
-      email: data.user.email,
-      created_at: data.user.created_at,
+      id: req.user.id,
+      email: req.user.email,
+      created_at: req.user.created_at,
     },
   });
 });
 
+// GET /protected/dashboard - a second locked door, to show the middleware
+// works for any route without repeating the token logic.
+router.get("/dashboard", (req, res) => {
+  res.json({
+    message: `Welcome back, ${req.user.email}`,
+    stats: { logins_today: 1, unread: 0 },
+    server_time: new Date().toISOString(),
+  });
+});
+
 module.exports = router;
-module.exports.extractToken = extractToken;
