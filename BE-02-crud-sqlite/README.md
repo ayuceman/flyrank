@@ -42,8 +42,8 @@ You can point the API at a different location with the `DB_PATH` environment var
 Requires Node.js 18+ (uses the built-in `fetch` in the tests).
 
 ```bash
-git clone https://github.com/ayuceman/week-3-crud-sqlite.git
-cd week-3-crud-sqlite
+git clone https://github.com/ayuceman/flyrank.git
+cd flyrank/BE-02-crud-sqlite
 npm install
 npm start
 ```
@@ -174,7 +174,7 @@ Stage 5: database documentation
 - [x] CRUD operations use SQL queries (prepared statements, parameterised — no string concatenation of user input)
 - [x] Unknown ids return 404
 - [x] Invalid requests return 400
-- [x] Public GitHub repository with README and database screenshot
+- [x] Public GitHub repository with README and database screenshot (`BE-02-crud-sqlite/` in the `flyrank` monorepo)
 - [x] Extras: `?search=` (LIKE), `?done=` (WHERE), `?sort=title` (ORDER BY), `/stats` (COUNT/SUM), `created_at`/`updated_at`
 
 ## What I noticed

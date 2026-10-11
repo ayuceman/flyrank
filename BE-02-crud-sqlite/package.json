@@ -1,5 +1,5 @@
 {
-  "name": "week-3-crud-sqlite",
+  "name": "be-02-crud-sqlite",
   "version": "1.0.0",
   "description": "FlyRank Week 3 (BE-02) — Tasks CRUD API backed by a SQLite database instead of an in-memory array",
   "main": "server.js",
