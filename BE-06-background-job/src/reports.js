@@ -19,9 +19,11 @@ function getReport(id) {
   return reports.get(id) || null;
 }
 
+// Upsert. The job may finish after a restart wiped this map (see README,
+// "the restart experiment"), so a missing row is recreated from the event data
+// rather than treated as an error.
 function setReport(id, patch) {
-  const current = reports.get(id);
-  if (!current) return null;
+  const current = reports.get(id) || { id, created_at: new Date().toISOString() };
   const next = { ...current, ...patch };
   reports.set(id, next);
   return next;

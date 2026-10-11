@@ -2,7 +2,7 @@ const express = require('express');
 const { serve } = require('inngest/express');
 const { inngest } = require('./inngest/client');
 const { functions } = require('./inngest/functions');
-const { createReport, getReport } = require('./reports');
+const { createReport, getReport, allReports } = require('./reports');
 
 const app = express();
 app.use(express.json());
@@ -28,6 +28,11 @@ app.post('/reports', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// Extra: the control panel. Every report and its status.
+app.get('/reports', (req, res) => {
+  res.json(allReports());
 });
 
 // The status endpoint: pending now, done (+ result) later.

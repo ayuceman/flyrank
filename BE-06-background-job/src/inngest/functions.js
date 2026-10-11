@@ -1,5 +1,9 @@
+const fs = require('node:fs/promises');
+const path = require('node:path');
 const { inngest } = require('./client');
 const { getReport, setReport, allReports } = require('../reports');
+
+const OUTBOX = path.join(__dirname, '..', '..', 'outbox');
 
 // Stage 1: the introductions. Trigger it from the Dev Server dashboard (Invoke).
 // Note: inngest v4 puts triggers inside the options object, not as a second argument.
@@ -15,11 +19,13 @@ const sayHello = inngest.createFunction(
 // this function does the 8-second job and writes the result back.
 // Stage 3: retries. A thrown error inside a step makes Inngest retry the run.
 // retries: 2 means 3 attempts in total, then the run ends Failed.
+// Stretch: concurrency 2 — at most two reports build at once, the rest wait in line.
 const makeReport = inngest.createFunction(
   {
     id: 'make-report',
     triggers: [{ event: 'report/requested' }],
     retries: 2,
+    concurrency: 2,
     // Runs once, after the last retry has failed. Someone must find out.
     onFailure: async ({ event, error }) => {
       const { id } = event.data.event.data;
@@ -30,22 +36,42 @@ const makeReport = inngest.createFunction(
   async ({ event, step }) => {
     const { id, topic } = event.data;
 
+    // Stretch: idempotency. The same event will arrive twice one day (a retry,
+    // a replay, a double click). If the report is already built, do nothing.
+    const already = await step.run('check-not-already-done', async () => {
+      const report = getReport(id);
+      return report ? report.status === 'done' : false;
+    });
+    if (already) return { id, skipped: 'already done' };
+
     // Stand-in for the real slow thing (an AI call, a big export).
-    await step.sleep('do-the-slow-work', '8s');
+    // The brief suggests step.sleep here. I used step.run with a timer instead,
+    // because a sleeping step releases its concurrency slot (nothing is running),
+    // so the concurrency limit above would never be visible. A real AI call is
+    // a step.run that waits on the network — this is the same shape.
+    await step.run('do-the-slow-work', () => new Promise((r) => setTimeout(r, 8000)));
 
     const result = await step.run('build-report', async () => {
       // A "bad moment" we can trigger on demand, to watch the retry.
       if (topic === 'fail') throw new Error('The report oven is broken!');
 
-      const report = getReport(id);
-      if (!report) throw new Error(`Report ${id} not found in store`);
       const built = {
         title: `Report on ${topic}`,
         summary: `Everything you need to know about ${topic}, in one paragraph.`,
         generated_at: new Date().toISOString(),
       };
-      setReport(id, { status: 'done', result: built });
+      // Upsert: if the API restarted and lost the row, the event still has
+      // everything needed to finish the job.
+      setReport(id, { topic, status: 'done', result: built });
       return built;
+    });
+
+    // Extra: the "email". A stand-in for sending mail from a job.
+    await step.run('write-outbox', async () => {
+      await fs.mkdir(OUTBOX, { recursive: true });
+      const file = path.join(OUTBOX, `${id}.txt`);
+      await fs.writeFile(file, `${result.title}\n\n${result.summary}\n\nGenerated ${result.generated_at}\n`);
+      return file;
     });
 
     return { id, result };
