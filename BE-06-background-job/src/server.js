@@ -15,7 +15,11 @@ app.get('/health', (req, res) => {
 app.post('/reports', async (req, res, next) => {
   try {
     const { topic } = req.body || {};
-    const report = createReport(topic);
+    // Wrong input is rejected at the door. No report, no event, nothing to retry.
+    if (typeof topic !== 'string' || topic.trim() === '') {
+      return res.status(400).json({ error: 'topic is required' });
+    }
+    const report = createReport(topic.trim());
     await inngest.send({
       name: 'report/requested',
       data: { id: report.id, topic: report.topic },

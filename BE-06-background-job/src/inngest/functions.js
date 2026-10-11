@@ -13,8 +13,20 @@ const sayHello = inngest.createFunction(
 
 // Stage 2: the slow work. POST /reports sends report/requested and returns 202;
 // this function does the 8-second job and writes the result back.
+// Stage 3: retries. A thrown error inside a step makes Inngest retry the run.
+// retries: 2 means 3 attempts in total, then the run ends Failed.
 const makeReport = inngest.createFunction(
-  { id: 'make-report', triggers: [{ event: 'report/requested' }] },
+  {
+    id: 'make-report',
+    triggers: [{ event: 'report/requested' }],
+    retries: 2,
+    // Runs once, after the last retry has failed. Someone must find out.
+    onFailure: async ({ event, error }) => {
+      const { id } = event.data.event.data;
+      setReport(id, { status: 'failed', error: error.message });
+      console.error(`[make-report] gave up on ${id}: ${error.message}`);
+    },
+  },
   async ({ event, step }) => {
     const { id, topic } = event.data;
 
@@ -22,6 +34,9 @@ const makeReport = inngest.createFunction(
     await step.sleep('do-the-slow-work', '8s');
 
     const result = await step.run('build-report', async () => {
+      // A "bad moment" we can trigger on demand, to watch the retry.
+      if (topic === 'fail') throw new Error('The report oven is broken!');
+
       const report = getReport(id);
       if (!report) throw new Error(`Report ${id} not found in store`);
       const built = {
