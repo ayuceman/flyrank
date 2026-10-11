@@ -1,5 +1,5 @@
 const { inngest } = require('./client');
-const { getReport, setReport } = require('../reports');
+const { getReport, setReport, allReports } = require('../reports');
 
 // Stage 1: the introductions. Trigger it from the Dev Server dashboard (Invoke).
 // Note: inngest v4 puts triggers inside the options object, not as a second argument.
@@ -52,4 +52,17 @@ const makeReport = inngest.createFunction(
   }
 );
 
-module.exports = { functions: [sayHello, makeReport] };
+// Stage 4: the clock. No endpoint, no event — a schedule is the only trigger.
+// Every minute is for watching it work; a real one would be daily (0 8 * * *).
+const heartbeat = inngest.createFunction(
+  { id: 'heartbeat', triggers: [{ cron: '* * * * *' }] },
+  async () => {
+    const counts = { pending: 0, done: 0, failed: 0 };
+    for (const r of allReports()) counts[r.status] = (counts[r.status] || 0) + 1;
+    const line = `[heartbeat] ${new Date().toISOString()} reports: pending=${counts.pending} done=${counts.done} failed=${counts.failed}`;
+    console.log(line);
+    return counts;
+  }
+);
+
+module.exports = { functions: [sayHello, makeReport, heartbeat] };
