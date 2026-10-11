@@ -44,7 +44,10 @@ for (const col of ["created_at", "updated_at"]) {
 const { count } = db.prepare("SELECT COUNT(*) AS count FROM tasks").get();
 
 if (count === 0) {
-  const insert = db.prepare("INSERT INTO tasks (title, done) VALUES (?, ?)");
+  const insert = db.prepare(`
+    INSERT INTO tasks (title, done, created_at, updated_at)
+    VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  `);
   const seed = db.transaction((rows) => {
     for (const [title, done] of rows) insert.run(title, done);
   });

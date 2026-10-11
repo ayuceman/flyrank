@@ -41,7 +41,10 @@ function parseId(raw) {
 const COLS = "id, title, done, created_at, updated_at";
 const stmts = {
   byId: db.prepare(`SELECT ${COLS} FROM tasks WHERE id = ?`),
-  insert: db.prepare("INSERT INTO tasks (title, done) VALUES (?, ?)"),
+  insert: db.prepare(`
+    INSERT INTO tasks (title, done, created_at, updated_at)
+    VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  `),
   update: db.prepare(
     "UPDATE tasks SET title = ?, done = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
   ),
