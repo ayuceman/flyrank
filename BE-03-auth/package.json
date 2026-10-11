@@ -1,0 +1,19 @@
+{
+  "name": "be-03-auth",
+  "version": "1.0.0",
+  "description": "FlyRank BE-03 - signup/login/logout with Supabase Auth and JWT-protected routes",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node test/auth.test.js"
+  },
+  "author": "Ayushman Bajracharya",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "dotenv": "^18.0.7",
+    "express": "^4.22.3",
+    "swagger-ui-express": "^5.0.1"
+  }
+}
