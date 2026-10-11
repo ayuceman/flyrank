@@ -213,4 +213,5 @@ const MSG = { text: "I was charged twice this month, please refund one of them" 
 
   fake.close();
   console.log(`\n${passed} checks passed`);
+  process.exit(0); // the fake's "slow" handler is still sleeping; don't wait for it
 })().catch((err) => { console.error("\nFAILED:", err.message); process.exit(1); });

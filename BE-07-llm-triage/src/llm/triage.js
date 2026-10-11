@@ -54,6 +54,7 @@ export async function runTriage(userText) {
   const second = await complete({
     systemPrompt,
     userText,
+    repair: true,
     extraMessages: [
       { role: "assistant", content: first.text },
       {

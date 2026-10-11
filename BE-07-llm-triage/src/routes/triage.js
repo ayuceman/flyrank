@@ -1,7 +1,7 @@
 import express from "express";
 import { TriageInput, FALLBACK, describeIssues } from "../llm/schema.js";
 import { runTriage } from "../llm/triage.js";
-import { PROMPT_VERSION } from "../llm/client.js";
+import { PROMPT_VERSION, LLMError } from "../llm/client.js";
 
 const router = express.Router();
 
@@ -14,6 +14,13 @@ router.post("/", async (req, res, next) => {
   }
 
   res.set("X-Prompt-Version", PROMPT_VERSION);
+
+  // kill switch: somebody who is not me can turn the model off without a deploy.
+  // deterministic fallback so the rest of the system keeps working.
+  if (process.env.LLM_ENABLED === "false") {
+    res.set("X-Triage-Source", "fallback");
+    return res.json(FALLBACK);
+  }
 
   // stub mode: skip the model entirely, return something that satisfies the schema
   if (process.env.LLM_STUB === "1") {
@@ -29,6 +36,10 @@ router.post("/", async (req, res, next) => {
     res.set("X-Triage-Source", result.repaired ? "model-repaired" : "model");
     res.json(result.data);
   } catch (err) {
+    if (err instanceof LLMError) {
+      // 504 for a timeout, 502 for everything else upstream. never the raw provider error.
+      return res.status(err.status === 504 ? 504 : 502).json({ error: err.message });
+    }
     next(err);
   }
 });
