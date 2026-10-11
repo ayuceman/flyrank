@@ -10,6 +10,7 @@ self-contained project with its own README, `package.json` and commit history.
 | BE-01 | 2 | [`BE-01-first-api/`](BE-01-first-api/) | First Express API with JSON endpoints |
 | BE-02 | 3 | [`BE-02-crud-sqlite/`](BE-02-crud-sqlite/) | Tasks CRUD API persisted in SQLite |
 | BE-03 | 4 | [`BE-03-auth/`](BE-03-auth/) | Signup/login/logout with Supabase Auth, JWT-protected routes, Swagger |
+| BE-07 | 6 | [`BE-07-llm-triage/`](BE-07-llm-triage/) | POST /triage: an LLM behind one endpoint with schema validation, repair, timeout, retries, cost log, kill switch |
 | BE-04 | 3 | [`BE-04-containerize/`](BE-04-containerize/) | Same API on Postgres + Redis, whole stack in Docker Compose |
 
 ## Running an assignment
