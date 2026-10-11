@@ -1,0 +1,17 @@
+{
+  "name": "be-06-background-job",
+  "version": "1.0.0",
+  "description": "FlyRank BE-06: a slow report built by a background job (Express + Inngest)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:3000/api/inngest",
+    "test": "node --test test/"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.22.3",
+    "inngest": "^4.23.0"
+  }
+}
