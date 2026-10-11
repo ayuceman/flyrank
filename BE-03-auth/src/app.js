@@ -1,5 +1,7 @@
 const express = require("express");
 const authRoutes = require("./routes/auth");
+const publicRoutes = require("./routes/public");
+const protectedRoutes = require("./routes/protected");
 
 function createApp() {
   const app = express();
@@ -10,6 +12,8 @@ function createApp() {
   });
 
   app.use("/auth", authRoutes);
+  app.use("/public", publicRoutes);
+  app.use("/protected", protectedRoutes);
 
   app.use((req, res) => res.status(404).json({ error: "Not found" }));
 
