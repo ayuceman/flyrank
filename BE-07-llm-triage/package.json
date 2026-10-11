@@ -1,0 +1,22 @@
+{
+  "name": "be-07-llm-triage",
+  "version": "1.0.0",
+  "description": "FlyRank BE-07 - POST /triage: one support message in, validated JSON verdict out, with a timeout, retry policy, cost log and kill switch",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env src/index.js",
+    "dev": "node --watch --env-file=.env src/index.js",
+    "hello": "node --env-file=.env src/llm/hello.js",
+    "eval": "node --env-file=.env evals/run.js",
+    "test": "node test/triage.test.js"
+  },
+  "author": "Ayushman Bajracharya",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^18.0.7",
+    "express": "^4.22.3",
+    "openai": "^7.32.0",
+    "zod": "^4.6.5"
+  }
+}
