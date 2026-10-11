@@ -12,6 +12,7 @@ self-contained project with its own README, `package.json` and commit history.
 | BE-03 | 4 | [`BE-03-auth/`](BE-03-auth/) | Signup/login/logout with Supabase Auth, JWT-protected routes, Swagger |
 | BE-07 | 6 | [`BE-07-llm-triage/`](BE-07-llm-triage/) | POST /triage: an LLM behind one endpoint with schema validation, repair, timeout, retries, cost log, kill switch |
 | BE-04 | 3 | [`BE-04-containerize/`](BE-04-containerize/) | Same API on Postgres + Redis, whole stack in Docker Compose |
+| BE-06 | 7 | [`BE-06-background-job/`](BE-06-background-job/) | Slow work moved into an Inngest background job: 202 + status endpoint, retries, cron heartbeat, idempotent and survives restarts |
 
 ## AI Fluency track
 
