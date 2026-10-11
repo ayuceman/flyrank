@@ -1,0 +1,14 @@
+{
+  "name": "report-api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "start": "INNGEST_DEV=1 node src/server.js",
+    "inngest": "npx inngest-cli@latest dev -u http://localhost:3000/api/inngest"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "inngest": "^4.0.0"
+  }
+}

@@ -161,6 +161,81 @@ and resumed it against the restarted API, re-running only the step that had not 
 die was the pending row in my map, which is the A1 lesson again: in-memory state is for toys, and a
 job must be able to finish from what is in the event.
 
+## AI vs me (Stage 6)
+
+I built Stages 0–5 by hand first, then wrote this prompt from memory, without the brief open, and
+gave it to an AI assistant in a fresh session. The output is in [`ai-version/`](ai-version/) exactly
+as returned (nothing edited; I only added a `.gitignore`).
+
+**My prompt (round 1):**
+
+> I need a small Node.js API where the slow work happens in a background job. Express for the API,
+> Inngest for the jobs (the local Inngest dev server, no account).
+>
+> What it has to do:
+> - GET /health returns {"status":"ok"}
+> - POST /reports with a JSON body {"topic":"cats"}. It must answer right away with HTTP 202 and
+>   {"id": "...", "status": "pending"}. No slow work inside the request. It should save the report in
+>   memory (an object/map is fine) and send an Inngest event called report/requested with the id and topic.
+> - If topic is missing or empty -> 400 with an error message, and no event is sent.
+> - GET /reports/:id returns the saved report. At first status is "pending", later "done" with a
+>   result. Unknown id -> 404.
+> - An Inngest function make-report triggered by report/requested. It must have at least two steps:
+>   a sleep of 8 seconds that stands in for the slow work, then a step that builds the result and
+>   marks the report done.
+> - If the topic is exactly "fail", the build step throws an error. Retries should be set to 2 so I
+>   can watch 3 attempts in the dashboard and then a failed run.
+> - A cron function heartbeat that runs every minute and logs one line with how many reports are
+>   pending, done and failed.
+> - Serve the Inngest functions at /api/inngest. Inngest client id: report-api.
+> - CommonJS (require), Express 4, port 3000. Keep it to a few files.
+>
+> Also tell me the two commands to run (the API and the Inngest dev server).
+
+**Running it.** I ran the AI version on its own Dev Server and fired my Stage 2 and Stage 3
+checkpoints at it. `GET /health` 200 ✓. Missing topic 400 ✓. `POST /reports` 202 in 18 ms ✓,
+`pending` then `done` after 8 s ✓. Unknown id 404 ✓. Topic `fail`: three attempts, run Failed,
+report marked `failed` ✓. So it passed every behaviour checkpoint — once it was running. Getting
+it running is where the differences were.
+
+**What the AI did better — and do I understand it?**
+It wrapped `inngest.send` in a try/catch and returns `503 Could not enqueue report job` (and marks
+the report failed) when the Dev Server is unreachable. Mine falls through to a generic 500. I
+understand it and I'd keep it: a 503 tells the client "try again later", a 500 says "I'm broken",
+and the difference matters to whoever is polling. It also stored `result: null, error: null,
+updatedAt` on every report from the start, so the shape never changes between states — tidier than
+my object that grows fields.
+
+**What it got wrong or silently ignored.**
+It pinned `inngest@^3.22` and used the SDK v3 signature, `createFunction(opts, { event }, handler)`.
+Against the current v4 package that line throws at startup (`"createFunction" expected a handler
+function as the second argument`), so the code as delivered does not start on a fresh
+`npm install inngest`. It only ran because its own `package.json` pins v3. It also hard-coded
+`const PORT = 3000` with no `process.env.PORT` — I did say "port 3000", so that one is on me, but
+it's the kind of thing a reviewer would flag. And its `onFailure` reads the error from
+`event.data.error.message`, which is the v3 payload shape; under v4 the handler gets `error` directly.
+
+**What my prompt forgot — and what the AI decided for me.**
+I never said which SDK version, so it picked the one it knew. I never said what the Dev Server
+address was, so it assumed the default port and the `INNGEST_DEV` auto-detection — when I ran it on a
+second Dev Server on another port I had to find `INNGEST_BASE_URL` myself. I never specified the
+result shape, so it returned a string (`"Report on cats: cats are fascinating..."`) where mine is an
+object. I never said anything about idempotency, concurrency, or what happens if the store is wiped
+mid-job, so none of that exists — which is fair, it did exactly what I asked and nothing more.
+
+**The rematch.** I rewrote the prompt with the things I'd learned: the exact v4 `createFunction`
+shape with `triggers` in the options and `onFailure({ event, error })`, `PORT` from the environment,
+`INNGEST_DEV=1` in the start script, the step names and order including the idempotency check, a
+`step.run` timer instead of `step.sleep` so concurrency is visible, the result object shape, the
+exact 400 and 404 bodies, an upsert on done/failed, and an ISO timestamp in the heartbeat line. The
+output is in [`ai-version/rematch/`](ai-version/rematch/). What changed in one sentence: the second
+version is structurally the same as my hand-built one — v4 signatures, four steps in my order, an
+upsert store, concurrency 2 — which says the first round's gaps were all in my specification, not
+in the model.
+
+The real lesson: I could only write the second prompt because I had built the thing and watched it
+break first.
+
 ## Commits
 
 One per stage, in order: `Stage 0: hello server` → `Stage 1: Inngest connected, first function runs`
