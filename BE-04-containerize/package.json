@@ -1,0 +1,21 @@
+{
+  "name": "be-04-containerize",
+  "version": "1.0.0",
+  "description": "FlyRank BE-04 - tasks API with a Postgres repository, running in Docker Compose",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node test/api.test.js",
+    "test:memory": "REPOSITORY=memory node test/api.test.js",
+    "explain": "psql \"$DATABASE_URL\" -f scripts/explain.sql"
+  },
+  "author": "Ayushman Bajracharya",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^18.0.7",
+    "express": "^4.22.3",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.1"
+  }
+}
