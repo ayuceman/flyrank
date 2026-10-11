@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tasks}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tasks}
+      POSTGRES_DB: ${POSTGRES_DB:-tasks}
+    ports:
+      - "5432:5432"
+    volumes:
+      # named volume = the data outlives the container
+      - pgdata:/var/lib/postgresql/data
+      # runs once, when the volume is first created
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tasks} -d ${POSTGRES_DB:-tasks}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      # inside the compose network the host is the service name, not localhost
+      DATABASE_URL: postgres://${POSTGRES_USER:-tasks}:${POSTGRES_PASSWORD:-tasks}@db:5432/${POSTGRES_DB:-tasks}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
