@@ -1,4 +1,6 @@
 const express = require("express");
+const swaggerUi = require("swagger-ui-express");
+const openapi = require("./openapi");
 const authRoutes = require("./routes/auth");
 const publicRoutes = require("./routes/public");
 const protectedRoutes = require("./routes/protected");
@@ -14,6 +16,10 @@ function createApp() {
   app.use("/auth", authRoutes);
   app.use("/public", publicRoutes);
   app.use("/protected", protectedRoutes);
+
+  // Swagger UI at /docs, raw spec at /openapi.json
+  app.get("/openapi.json", (req, res) => res.json(openapi));
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle: "BE-03 Auth API" }));
 
   app.use((req, res) => res.status(404).json({ error: "Not found" }));
 
