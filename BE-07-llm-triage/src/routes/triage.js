@@ -1,9 +1,9 @@
 import express from "express";
 import { TriageInput, FALLBACK, describeIssues } from "../llm/schema.js";
-import { complete, loadPrompt, PROMPT_VERSION } from "../llm/client.js";
+import { runTriage } from "../llm/triage.js";
+import { PROMPT_VERSION } from "../llm/client.js";
 
 const router = express.Router();
-const systemPrompt = loadPrompt();
 
 // POST /triage
 router.post("/", async (req, res, next) => {
@@ -13,6 +13,8 @@ router.post("/", async (req, res, next) => {
     return res.status(400).json({ error: "Invalid input", issues: describeIssues(parsed.error) });
   }
 
+  res.set("X-Prompt-Version", PROMPT_VERSION);
+
   // stub mode: skip the model entirely, return something that satisfies the schema
   if (process.env.LLM_STUB === "1") {
     res.set("X-Triage-Source", "stub");
@@ -20,10 +22,12 @@ router.post("/", async (req, res, next) => {
   }
 
   try {
-    // Stage 2: call the model and return whatever came back. Stage 3 makes this trustworthy.
-    const { text } = await complete({ systemPrompt, userText: parsed.data.text });
-    res.set("X-Prompt-Version", PROMPT_VERSION);
-    res.type("text/plain").send(text);
+    const result = await runTriage(parsed.data.text);
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error, detail: result.detail });
+    }
+    res.set("X-Triage-Source", result.repaired ? "model-repaired" : "model");
+    res.json(result.data);
   } catch (err) {
     next(err);
   }

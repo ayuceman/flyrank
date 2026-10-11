@@ -2,7 +2,7 @@
 // pipeline (parse, validate, repair, retry, timeout, kill switch) can be tested
 // without network or quota. It is NOT a model: it keyword-matches the message
 // and returns canned JSON. Behaviour is chosen per request with the
-// "x-fake-mode" header, or globally with FAKE_MODE.
+// control endpoint (POST /mode {"mode": "..."}), or at start with FAKE_MODE.
 //
 //   node test/fake-llm.js            -> http://localhost:54400/v1
 //
@@ -36,7 +36,7 @@ export function createFakeLLM() {
   }
 
   app.post("/v1/chat/completions", async (req, res) => {
-    const mode = req.get("x-fake-mode") || process.env.FAKE_MODE || "ok";
+    const mode = process.env.FAKE_MODE || "ok";
     calls.total++;
     calls.byMode[mode] = (calls.byMode[mode] || 0) + 1;
 
@@ -88,6 +88,8 @@ export function createFakeLLM() {
 
   app.get("/calls", (req, res) => res.json(calls));
   app.post("/reset", (req, res) => { calls.total = 0; calls.byMode = {}; flip = {}; res.json({ ok: true }); });
+  // test control: POST /mode { "mode": "fenced" } switches behaviour for the next calls
+  app.post("/mode", (req, res) => { process.env.FAKE_MODE = req.body.mode || "ok"; flip = {}; res.json({ mode: process.env.FAKE_MODE }); });
   return app;
 }
 
