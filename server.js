@@ -35,7 +35,26 @@ function parseId(raw) {
 const stmts = {
   all: db.prepare("SELECT id, title, done FROM tasks ORDER BY id"),
   byId: db.prepare("SELECT id, title, done FROM tasks WHERE id = ?"),
+  insert: db.prepare("INSERT INTO tasks (title, done) VALUES (?, ?)"),
 };
+
+// Validate a request body. Returns an error message, or null if valid.
+// `partial` = true for PUT, where fields are optional but must be the right type.
+function validateBody(body, { partial = false } = {}) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return "Request body must be a JSON object";
+  }
+  const hasTitle = body.title !== undefined;
+  const hasDone = body.done !== undefined;
+
+  if (!partial && !hasTitle) return "title is required";
+  if (hasTitle && (typeof body.title !== "string" || body.title.trim() === "")) {
+    return "title must be a non-empty string";
+  }
+  if (hasDone && typeof body.done !== "boolean") return "done must be a boolean";
+  if (partial && !hasTitle && !hasDone) return "Provide at least one of: title, done";
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Stage 1 — Read
@@ -53,6 +72,31 @@ app.get("/tasks/:id", (req, res) => {
   const row = id === null ? undefined : stmts.byId.get(id);
   if (!row) return res.status(404).json({ error: "Task not found" });
   res.json(toTask(row));
+});
+
+// ---------------------------------------------------------------------------
+// Stage 2 — Create
+// ---------------------------------------------------------------------------
+
+// POST /tasks — insert a row; 400 on invalid body, 201 with the new task
+app.post("/tasks", (req, res) => {
+  const error = validateBody(req.body);
+  if (error) return res.status(400).json({ error });
+
+  const title = req.body.title.trim();
+  const done = req.body.done === true ? 1 : 0;
+
+  const result = stmts.insert.run(title, done);
+  const row = stmts.byId.get(result.lastInsertRowid);
+  res.status(201).json(toTask(row));
+});
+
+// Malformed JSON bodies -> 400 with a JSON error (instead of Express's HTML page)
+app.use((err, req, res, next) => {
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+  next(err);
 });
 
 app.listen(PORT, () => {
