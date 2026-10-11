@@ -20,11 +20,24 @@ db.pragma("journal_mode = WAL");
 //    SQLite has no BOOLEAN type; the convention is INTEGER 0 / 1.
 db.exec(`
   CREATE TABLE IF NOT EXISTS tasks (
-    id    INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT    NOT NULL,
-    done  INTEGER NOT NULL DEFAULT 0 CHECK (done IN (0, 1))
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    title      TEXT    NOT NULL,
+    done       INTEGER NOT NULL DEFAULT 0 CHECK (done IN (0, 1)),
+    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   )
 `);
+
+// Tiny "migration" (optional extra: timestamps). If tasks.db was created by an
+// earlier version of this project without the timestamp columns, add them.
+const columns = db.prepare("PRAGMA table_info(tasks)").all().map((c) => c.name);
+for (const col of ["created_at", "updated_at"]) {
+  if (!columns.includes(col)) {
+    db.exec(`ALTER TABLE tasks ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`);
+    db.exec(`UPDATE tasks SET ${col} = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE ${col} = ''`);
+    console.log(`migrated: added ${col} column`);
+  }
+}
 
 // 2) Insert three example tasks — but ONLY if the table is empty.
 //    Restarting the server many times must not duplicate the seed rows.

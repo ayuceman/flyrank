@@ -22,7 +22,13 @@ app.get("/health", (req, res) => {
 // SQLite stores booleans as 0/1. Convert to real true/false for the client so
 // the JSON looks exactly like it did when tasks lived in an array.
 function toTask(row) {
-  return { id: row.id, title: row.title, done: row.done === 1 };
+  return {
+    id: row.id,
+    title: row.title,
+    done: row.done === 1,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
 }
 
 // Parse the :id route param. Returns null for anything that isn't a positive integer.
@@ -32,12 +38,20 @@ function parseId(raw) {
 }
 
 // Prepared statements are compiled once and reused — faster and safe from SQL injection.
+const COLS = "id, title, done, created_at, updated_at";
 const stmts = {
-  all: db.prepare("SELECT id, title, done FROM tasks ORDER BY id"),
-  byId: db.prepare("SELECT id, title, done FROM tasks WHERE id = ?"),
+  byId: db.prepare(`SELECT ${COLS} FROM tasks WHERE id = ?`),
   insert: db.prepare("INSERT INTO tasks (title, done) VALUES (?, ?)"),
-  update: db.prepare("UPDATE tasks SET title = ?, done = ? WHERE id = ?"),
+  update: db.prepare(
+    "UPDATE tasks SET title = ?, done = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
+  ),
   remove: db.prepare("DELETE FROM tasks WHERE id = ?"),
+  stats: db.prepare(`
+    SELECT COUNT(*)                                   AS total,
+           COALESCE(SUM(done = 1), 0)                 AS done,
+           COALESCE(SUM(done = 0), 0)                 AS pending
+    FROM tasks
+  `),
 };
 
 // Validate a request body. Returns an error message, or null if valid.
@@ -62,10 +76,48 @@ function validateBody(body, { partial = false } = {}) {
 // Stage 1 — Read
 // ---------------------------------------------------------------------------
 
-// GET /tasks — every task in the database
+// GET /tasks — every task in the database.
+// Optional extras (all done in SQL, not JavaScript):
+//   ?search=milk   -> WHERE title LIKE '%milk%'
+//   ?done=true     -> WHERE done = 1   (or ?done=false)
+//   ?sort=title    -> ORDER BY title   (default: ORDER BY id)
 app.get("/tasks", (req, res) => {
-  const rows = stmts.all.all();
+  const where = [];
+  const params = [];
+
+  if (typeof req.query.search === "string" && req.query.search.trim() !== "") {
+    where.push("title LIKE ?");
+    params.push(`%${req.query.search.trim()}%`);
+  }
+
+  if (req.query.done !== undefined) {
+    if (req.query.done !== "true" && req.query.done !== "false") {
+      return res.status(400).json({ error: "done must be true or false" });
+    }
+    where.push("done = ?");
+    params.push(req.query.done === "true" ? 1 : 0);
+  }
+
+  let orderBy = "id";
+  if (req.query.sort !== undefined) {
+    if (req.query.sort !== "title" && req.query.sort !== "id") {
+      return res.status(400).json({ error: "sort must be title or id" });
+    }
+    orderBy = req.query.sort === "title" ? "title COLLATE NOCASE" : "id";
+  }
+
+  const sql =
+    `SELECT ${COLS} FROM tasks` +
+    (where.length ? ` WHERE ${where.join(" AND ")}` : "") +
+    ` ORDER BY ${orderBy}`;
+
+  const rows = db.prepare(sql).all(...params);
   res.json(rows.map(toTask));
+});
+
+// GET /stats — counts computed by SQL's COUNT()/SUM(), not in JavaScript
+app.get("/stats", (req, res) => {
+  res.json(stmts.stats.get());
 });
 
 // GET /tasks/:id — one task, or 404
