@@ -13,6 +13,12 @@ self-contained project with its own README, `package.json` and commit history.
 | BE-07 | 6 | [`BE-07-llm-triage/`](BE-07-llm-triage/) | POST /triage: an LLM behind one endpoint with schema validation, repair, timeout, retries, cost log, kill switch |
 | BE-04 | 3 | [`BE-04-containerize/`](BE-04-containerize/) | Same API on Postgres + Redis, whole stack in Docker Compose |
 
+## AI Fluency track
+
+| Code | Week | Folder | Summary |
+|------|------|--------|---------|
+| FL-W2 | 2 | [`FL-W2-prompt-ladder/`](FL-W2-prompt-ladder/) | The Prompt Ladder: one weak prompt improved in five layers, with every output saved and reviewed |
+
 ## Running an assignment
 
 ```bash
